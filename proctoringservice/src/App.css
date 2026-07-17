@@ -98,6 +98,31 @@
   margin-bottom: 0.4rem;
 }
 
+.warning-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  background: rgba(15, 23, 42, 0.98);
+  color: #fde2e2;
+  padding: 2rem;
+}
+
+.warning-modal h2 {
+  margin-bottom: 1rem;
+  font-size: 2rem;
+  color: #ef4444;
+}
+
+.warning-modal p {
+  margin: 0.5rem 0;
+  font-size: 1.25rem;
+}
+
 @media (max-width: 640px) {
   .test-page {
     padding: 1rem;
