@@ -1,0 +1,18 @@
+{
+  "name": "complete-session-lambda",
+  "version": "1.0.0",
+  "description": "AWS Lambda to complete a proctoring session in DynamoDB",
+  "main": "index.js",
+  "license": "MIT",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.799.0",
+    "@aws-sdk/lib-dynamodb": "^3.799.0"
+  }
+}
