@@ -7,18 +7,43 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Dependencies
+node_modules/
+**/node_modules/
 
-# Editor directories and files
+# Build files
+dist/
+dist-ssr/
+
+# Environment files
+*.local
+.env
+
+# Lambda folders
+warning-lambda/
+complete-session-lambda/
+
+# Lambda dependencies
+**/node_modules/
+
+# Lambda zip files
+*.zip
+
+# VS Code
 .vscode/*
 !.vscode/extensions.json
-.idea
+
+# IntelliJ
+.idea/
+
+# OS files
 .DS_Store
+
+# Visual Studio
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
+
+# Swap files
 *.sw?
