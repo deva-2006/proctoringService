@@ -1,5 +1,5 @@
 import bcrypt
-from database.dynamodb import get_users_table, get_answers_table, get_questions_table
+from database.dynamodb import get_users_table, get_answers_table, get_questions_table, get_test_config_table
 
 def hash_password(password: str) -> str:
     """Hashes plain text password using bcrypt"""
@@ -48,19 +48,35 @@ def get_questions():
 
     return questions
 
-def submit_answers(name: str, email: str, responses: list):
+def get_test_duration():
+    """
+    Reads total_duration_minutes from test-config-tests table.
+    """
+    try:
+        table = get_test_config_table()
+        response = table.scan()
+        items = response.get("Items", [])
+        if items and "total_duration_minutes" in items[0]:
+            return int(items[0]["total_duration_minutes"])
+    except Exception as e:
+        print("Error fetching test duration:", e)
+    return 60
+
+def submit_answers(mailId: str, testId: str, durationMinutes: int, submitTime: str, answers: list):
     """
     Stores candidate answers in Answers table.
     """
     table = get_answers_table()
 
     # Convert pydantic models to plain dicts
-    responses_data = [r.model_dump() for r in responses]
+    answers_data = [a.model_dump() for a in answers]
 
     table.put_item(Item={
-        "email": email,
-        "name": name,
-        "responses": responses_data,
+        "mailId": mailId,
+        "testId": testId,
+        "durationMinutes": durationMinutes,
+        "submitTime": submitTime,
+        "answers": answers_data,
         "status": "submitted"
     })
 

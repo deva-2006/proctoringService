@@ -45,6 +45,8 @@ class AnswerItem(BaseModel):
 
 class SubmitRequest(BaseModel):
     """Model for POST /submit request body"""
-    name: str
-    email: str
-    responses: List[AnswerItem]
+    mailId: str
+    testId: str
+    durationMinutes: int
+    submitTime: str
+    answers: List[AnswerItem]

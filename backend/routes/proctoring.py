@@ -20,16 +20,20 @@ def get_all_sessions():
 @router.post("/session")
 def start_session(request: SessionStartRequest):
     try:
-        result = proctoring_service.start_session(request.email)
+        result = proctoring_service.start_session(
+            mailId=request.mailId,
+            testId=request.testId,
+            durationMinutes=request.durationMinutes
+        )
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/session/{email}")
-def get_session(email: str):
+@router.get("/session/{mailId}")
+def get_session(mailId: str):
     try:
-        result = proctoring_service.get_session(email.lower().strip())
+        result = proctoring_service.get_session(mailId.lower().strip())
         if not result:
             raise HTTPException(status_code=404, detail="Session not found")
         return result
@@ -42,7 +46,7 @@ def get_session(email: str):
 @router.post("/warning")
 def increment_warning(request: WarningIncrementRequest):
     try:
-        result = proctoring_service.increment_warning(request.email)
+        result = proctoring_service.increment_warning(request.mailId)
         if not result:
             raise HTTPException(status_code=404, detail="Session not found")
         return result
@@ -56,12 +60,14 @@ def increment_warning(request: WarningIncrementRequest):
 def submit_report(request: ProctoringReportRequest):
     try:
         session = proctoring_service.end_session(
-            request.email, request.status
+            request.mailId, request.status
         )
         report = {
-            "email": session["email"],
-            "startedTime": session["startedTime"],
-            "endedTime": session["endedTime"],
+            "mailId": session["mailId"],
+            "testId": session.get("testId", ""),
+            "durationMinutes": session.get("durationMinutes", 0),
+            "starttime": session["starttime"],
+            "endtime": session["endtime"],
             "status": session["status"],
             "warningCount": session["warningCount"],
         }

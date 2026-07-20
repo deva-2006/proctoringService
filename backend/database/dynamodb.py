@@ -32,3 +32,8 @@ def get_proctoring_sessions_table():
     """Returns the ProctoringSessions DynamoDB table."""
     dynamodb = get_dynamodb()
     return dynamodb.Table(os.getenv("PROCTORING_SESSIONS_TABLE", "ProctoringSessions"))
+
+def get_test_config_table():
+    """Returns the test-config-tests DynamoDB table."""
+    dynamodb = get_dynamodb()
+    return dynamodb.Table(os.getenv("TEST_CONFIG_TABLE", "test-config-tests"))

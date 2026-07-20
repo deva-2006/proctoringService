@@ -16,49 +16,55 @@ def get_all_sessions():
     table = get_proctoring_sessions_table()
     response = table.scan()
     items = response.get("Items", [])
-    items.sort(key=lambda x: x.get("startedTime", ""), reverse=True)
+    items.sort(key=lambda x: x.get("starttime", ""), reverse=True)
     return [{
-        "email": item["email"],
-        "startedTime": item.get("startedTime", ""),
-        "endedTime": item.get("endedTime", ""),
+        "mailId": item["mailId"],
+        "testId": item.get("testId", ""),
+        "durationMinutes": int(item.get("durationMinutes", 0)),
+        "starttime": item.get("starttime", ""),
+        "endtime": item.get("endtime", ""),
         "warningCount": int(item.get("warningCount", 0)),
         "status": item.get("status", ""),
     } for item in items]
 
 
-def start_session(email: str):
+def start_session(mailId: str, testId: str, durationMinutes: int):
     table = get_proctoring_sessions_table()
     started = _now_iso()
 
     table.put_item(Item={
-        "email": email,
-        "startedTime": started,
-        "endedTime": "",
+        "mailId": mailId,
+        "testId": testId,
+        "durationMinutes": durationMinutes,
+        "starttime": started,
+        "endtime": "",
         "warningCount": 0,
         "status": "IN_PROGRESS",
     })
 
-    return {"email": email, "startedTime": started, "warningCount": 0, "status": "IN_PROGRESS"}
+    return {"mailId": mailId, "testId": testId, "durationMinutes": durationMinutes, "starttime": started, "warningCount": 0, "status": "IN_PROGRESS"}
 
 
-def get_session(email: str):
+def get_session(mailId: str):
     table = get_proctoring_sessions_table()
-    response = table.get_item(Key={"email": email})
+    response = table.get_item(Key={"mailId": mailId})
     item = response.get("Item")
     if not item:
         return None
     return {
-        "email": item["email"],
-        "startedTime": item.get("startedTime", ""),
-        "endedTime": item.get("endedTime", ""),
+        "mailId": item["mailId"],
+        "testId": item.get("testId", ""),
+        "durationMinutes": int(item.get("durationMinutes", 0)),
+        "starttime": item.get("starttime", ""),
+        "endtime": item.get("endtime", ""),
         "warningCount": int(item.get("warningCount", 0)),
         "status": item.get("status", ""),
     }
 
 
-def increment_warning(email: str):
+def increment_warning(mailId: str):
     table = get_proctoring_sessions_table()
-    response = table.get_item(Key={"email": email})
+    response = table.get_item(Key={"mailId": mailId})
     item = response.get("Item")
     if not item:
         return None
@@ -67,32 +73,34 @@ def increment_warning(email: str):
     new_count = current + 1
 
     table.update_item(
-        Key={"email": email},
+        Key={"mailId": mailId},
         UpdateExpression="SET warningCount = :wc",
         ExpressionAttributeValues={":wc": new_count},
     )
 
-    return {"email": email, "warningCount": new_count}
+    return {"mailId": mailId, "testId": item.get("testId", ""), "warningCount": new_count}
 
 
-def end_session(email: str, status: str):
+def end_session(mailId: str, status: str):
     table = get_proctoring_sessions_table()
     ended = _now_iso()
 
     table.update_item(
-        Key={"email": email},
-        UpdateExpression="SET endedTime = :et, #s = :st",
+        Key={"mailId": mailId},
+        UpdateExpression="SET endtime = :et, #s = :st",
         ExpressionAttributeNames={"#s": "status"},
         ExpressionAttributeValues={":et": ended, ":st": status},
     )
 
-    response = table.get_item(Key={"email": email})
+    response = table.get_item(Key={"mailId": mailId})
     item = response.get("Item", {})
 
     return {
-        "email": item.get("email", email),
-        "startedTime": item.get("startedTime", ""),
-        "endedTime": item.get("endedTime", ended),
+        "mailId": item.get("mailId", mailId),
+        "testId": item.get("testId", ""),
+        "durationMinutes": int(item.get("durationMinutes", 0)),
+        "starttime": item.get("starttime", ""),
+        "endtime": item.get("endtime", ended),
         "warningCount": int(item.get("warningCount", 0)),
         "status": item.get("status", status),
     }

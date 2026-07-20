@@ -34,7 +34,8 @@ def questions():
     """
     try:
         data = candidate_service.get_questions()
-        return {"questions": data}
+        duration = candidate_service.get_test_duration()
+        return {"questions": data, "total_duration_minutes": duration}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -47,9 +48,11 @@ def submit(request: SubmitRequest):
     """
     try:
         result = candidate_service.submit_answers(
-            name=request.name,
-            email=request.email,
-            responses=request.responses
+            mailId=request.mailId,
+            testId=request.testId,
+            durationMinutes=request.durationMinutes,
+            submitTime=request.submitTime,
+            answers=request.answers
         )
         return result
     except Exception as e:

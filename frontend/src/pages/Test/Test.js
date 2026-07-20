@@ -5,6 +5,7 @@ import { fetchQuestions, startProctoringSession, incrementWarning, submitAnswers
 const TAB_RETURN_LIMIT_MS = 15000;
 const WARNING_LOCKOUT_MS = 5000;
 const FULLSCREEN_TIMEOUT_MS = 15000;
+const TEST_ID = "TEST-001";
 
 const Test = () => {
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ const Test = () => {
   const [terminationReason, setTerminationReason] = useState("");
   const [needsFullscreen, setNeedsFullscreen] = useState(false);
   const [fullscreenCountdown, setFullscreenCountdown] = useState(null);
-
+  const [timeLeft, setTimeLeft] = useState(null);
   const awayTimerRef = useRef(null);
   const lockoutTimerRef = useRef(null);
   const isAwayRef = useRef(false);
@@ -49,6 +50,9 @@ const Test = () => {
       try {
         const response = await fetchQuestions();
         setQuestions(response.data.questions);
+        const duration = response.data.total_duration_minutes || 60;
+        setTimeLeft(duration * 60);
+        localStorage.setItem("totalDurationMinutes", duration.toString());
       } catch (err) {
         setError("Failed to load questions. Please try again.");
       } finally {
@@ -89,7 +93,8 @@ const Test = () => {
     localStorage.setItem("proctoringWarningCount", "0");
     localStorage.setItem("proctoringStatus", "SUCCESS");
 
-    startProctoringSession({ email }).catch(() => {});
+    const duration = parseInt(localStorage.getItem("totalDurationMinutes") || "60", 10);
+    startProctoringSession({ mailId: email, testId: TEST_ID, durationMinutes: duration }).catch(() => {});
   }, [email]);
 
   // ── Terminate session ──
@@ -116,20 +121,26 @@ const Test = () => {
     }));
 
     submitAnswers({
-      name: candidate.name,
-      email: candidate.email,
-      responses,
+      mailId: candidate.email,
+      testId: TEST_ID,
+      durationMinutes: parseInt(localStorage.getItem("totalDurationMinutes") || "60", 10),
+      submitTime: endedTime,
+      answers: responses,
     }).catch(() => {});
 
     submitProctoringReport({
-      email,
-      startedTime,
-      endedTime,
+      mailId: candidate.email,
+      testId: TEST_ID,
+      durationMinutes: parseInt(localStorage.getItem("totalDurationMinutes") || "60", 10),
+      starttime: startedTime,
+      endtime: endedTime,
       status: "TERMINATED",
       warningCount: count,
     }).catch(() => {});
 
     localStorage.setItem("testSubmitted", "true");
+    localStorage.setItem("testTerminated", "true");
+    localStorage.setItem("terminationReason", reason);
     localStorage.removeItem("answers");
     localStorage.removeItem("questions");
     localStorage.removeItem("proctoringStartedTime");
@@ -151,7 +162,7 @@ const Test = () => {
         .catch(() => setNeedsFullscreen(true));
     }
 
-    incrementWarning({ email }).then((res) => {
+    incrementWarning({ mailId: email, testId: TEST_ID }).then((res) => {
       const newCount = res.data.warningCount;
       setWarningCount(newCount);
       localStorage.setItem("proctoringWarningCount", String(newCount));
@@ -218,7 +229,7 @@ const Test = () => {
     if (warningInFlightRef.current) return;
     warningInFlightRef.current = true;
 
-    incrementWarning({ email }).then((res) => {
+    incrementWarning({ mailId: email, testId: TEST_ID }).then((res) => {
       const newCount = res.data.warningCount;
       setWarningCount(newCount);
       localStorage.setItem("proctoringWarningCount", String(newCount));
@@ -321,6 +332,72 @@ const Test = () => {
   useEffect(() => { answersRef.current = answers; }, [answers]);
   useEffect(() => { questionsRef.current = questions; }, [questions]);
 
+  // ── Auto Submit when time is up ──
+  const autoSubmit = useCallback(async () => {
+    setLoading(true);
+    try {
+      const candidate = JSON.parse(localStorage.getItem("candidate") || "{}");
+      const currentAnswers = answersRef.current;
+      const currentQuestions = questionsRef.current;
+
+      const responses = currentQuestions.map((q) => ({
+        questionId: q.questionId,
+        selectedOption: currentAnswers[q.questionId] || "",
+      }));
+
+      await submitAnswers({
+        mailId: candidate.email,
+        testId: TEST_ID,
+        durationMinutes: parseInt(localStorage.getItem("totalDurationMinutes") || "60", 10),
+        submitTime: new Date().toISOString(),
+        answers: responses,
+      });
+
+      const startedTime = localStorage.getItem("proctoringStartedTime") || "";
+      const endedTime = new Date().toISOString();
+      const count = parseInt(localStorage.getItem("proctoringWarningCount") || "0", 10);
+
+      submitProctoringReport({
+        mailId: candidate.email,
+        testId: TEST_ID,
+        durationMinutes: parseInt(localStorage.getItem("totalDurationMinutes") || "60", 10),
+        starttime: startedTime,
+        endtime: endedTime,
+        status: "SUCCESS",
+        warningCount: count,
+      }).catch(() => {});
+
+      localStorage.setItem("testSubmitted", "true");
+      localStorage.removeItem("answers");
+      localStorage.removeItem("questions");
+      localStorage.removeItem("proctoringStartedTime");
+      localStorage.removeItem("proctoringWarningCount");
+      localStorage.removeItem("proctoringStatus");
+
+      navigate("/thankyou", { replace: true });
+    } catch (err) {
+      setError("Auto-submission failed. Please contact support.");
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate]);
+
+  // ── Timer Effect ──
+  useEffect(() => {
+    if (timeLeft === null || isTerminated) return;
+    
+    if (timeLeft <= 0) {
+      autoSubmit();
+      return;
+    }
+    
+    const timer = setInterval(() => {
+      setTimeLeft(prev => prev - 1);
+    }, 1000);
+    
+    return () => clearInterval(timer);
+  }, [timeLeft, isTerminated, autoSubmit]);
+
   // ── Option select ──
   const handleAnswer = (questionId, optionId) => {
     if (showWarningOverlay || isTerminated) return;
@@ -364,6 +441,13 @@ const Test = () => {
   }
 
   const currentQuestion = questions[currentIndex];
+
+  const formatTime = (seconds) => {
+    if (seconds === null) return "--:--";
+    const m = Math.floor(seconds / 60).toString().padStart(2, "0");
+    const s = (seconds % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  };
 
   // ── Terminated screen ──
   if (isTerminated) {
@@ -466,6 +550,9 @@ const Test = () => {
         <div className="bg-white rounded-xl shadow-md p-4 mb-6 flex justify-between items-center">
           <h1 className="text-xl font-bold text-blue-600">Online Assessment</h1>
           <div className="flex items-center gap-4">
+            <span className={`text-sm font-bold ${timeLeft !== null && timeLeft < 300 ? 'text-red-600 animate-pulse' : 'text-gray-800'}`}>
+              Time Left: {formatTime(timeLeft)}
+            </span>
             <span className="text-yellow-600 text-sm font-medium">
               Warnings: {warningCount}
             </span>

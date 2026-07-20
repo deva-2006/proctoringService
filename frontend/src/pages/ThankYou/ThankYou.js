@@ -1,6 +1,29 @@
 import React from "react";
 
 const ThankYou = () => {
+  const isTerminated = localStorage.getItem("testTerminated") === "true";
+  const terminationReason = localStorage.getItem("terminationReason") || "Your session has been terminated due to a violation of exam rules.";
+
+  if (isTerminated) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="bg-white p-10 rounded-xl shadow-md w-full max-w-md text-center">
+          <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+            <svg className="w-10 h-10 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </div>
+          <h1 className="text-2xl font-bold text-gray-800 mb-3">
+            Exam Terminated
+          </h1>
+          <p className="text-gray-500 text-sm">
+            {terminationReason}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-100 flex items-center justify-center">
       <div className="bg-white p-10 rounded-xl shadow-md w-full max-w-md text-center">
@@ -26,3 +49,4 @@ const ThankYou = () => {
 };
 
 export default ThankYou;
+
