@@ -10,13 +10,13 @@ const TEST_ID = "TEST-001";
 const Test = () => {
   const navigate = useNavigate();
 
-  const [questions, setQuestions] = useState([]);
+  const [questions, setQuestions] = useState(() => JSON.parse(localStorage.getItem("questions") || "[]"));
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [answers, setAnswers] = useState({});
+  const [answers, setAnswers] = useState(() => JSON.parse(localStorage.getItem("answers") || "{}"));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const [warningCount, setWarningCount] = useState(0);
+  const [warningCount, setWarningCount] = useState(() => parseInt(localStorage.getItem("proctoringWarningCount") || "0", 10));
   const [showWarningOverlay, setShowWarningOverlay] = useState(false);
   const [isTerminated, setIsTerminated] = useState(false);
   const [terminationReason, setTerminationReason] = useState("");
@@ -44,23 +44,51 @@ const Test = () => {
     }
   }, [navigate]);
 
-  // ── Fetch questions on mount ──
+  // ── Initialization (Questions & Proctoring Session) ──
   useEffect(() => {
-    const loadQuestions = async () => {
+    if (sessionStartedRef.current || !email) return;
+    sessionStartedRef.current = true;
+
+    const initializeTest = async () => {
       try {
-        const response = await fetchQuestions();
-        setQuestions(response.data.questions);
-        const duration = response.data.total_duration_minutes || 60;
-        setTimeLeft(duration * 60);
-        localStorage.setItem("totalDurationMinutes", duration.toString());
+        let duration = parseInt(localStorage.getItem("totalDurationMinutes") || "60", 10);
+
+        // Fetch questions if not cached
+        const cachedQuestions = localStorage.getItem("questions");
+        if (!cachedQuestions || cachedQuestions === "[]") {
+          const response = await fetchQuestions();
+          setQuestions(response.data.questions);
+          localStorage.setItem("questions", JSON.stringify(response.data.questions));
+          duration = response.data.total_duration_minutes || 60;
+          localStorage.setItem("totalDurationMinutes", duration.toString());
+        }
+
+        // Handle Proctoring Session & Timer
+        const existingStartedTime = localStorage.getItem("proctoringStartedTime");
+        if (existingStartedTime) {
+          // Resume existing session
+          const startedAt = new Date(existingStartedTime).getTime();
+          const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
+          setTimeLeft(Math.max(0, duration * 60 - elapsedSeconds));
+        } else {
+          // Start completely new session
+          const startedTime = new Date().toISOString();
+          localStorage.setItem("proctoringStartedTime", startedTime);
+          localStorage.setItem("proctoringWarningCount", "0");
+          localStorage.setItem("proctoringStatus", "SUCCESS");
+          setTimeLeft(duration * 60);
+
+          startProctoringSession({ mailId: email, testId: TEST_ID, durationMinutes: duration }).catch(() => {});
+        }
       } catch (err) {
-        setError("Failed to load questions. Please try again.");
+        setError("Failed to load test session. Please try again.");
       } finally {
         setLoading(false);
       }
     };
-    loadQuestions();
-  }, []);
+
+    initializeTest();
+  }, [email]);
 
   // ── Request fullscreen (must be called from user gesture) ──
   const enterFullscreen = useCallback(() => {
@@ -83,19 +111,6 @@ const Test = () => {
     return () => document.removeEventListener("fullscreenchange", update);
   }, [isTerminated]);
 
-  // ── Start proctoring session on mount ──
-  useEffect(() => {
-    if (sessionStartedRef.current || !email) return;
-    sessionStartedRef.current = true;
-
-    const startedTime = new Date().toISOString();
-    localStorage.setItem("proctoringStartedTime", startedTime);
-    localStorage.setItem("proctoringWarningCount", "0");
-    localStorage.setItem("proctoringStatus", "SUCCESS");
-
-    const duration = parseInt(localStorage.getItem("totalDurationMinutes") || "60", 10);
-    startProctoringSession({ mailId: email, testId: TEST_ID, durationMinutes: duration }).catch(() => {});
-  }, [email]);
 
   // ── Terminate session ──
   const terminateSession = useCallback((reason) => {
