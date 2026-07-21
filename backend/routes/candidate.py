@@ -57,3 +57,19 @@ def submit(request: SubmitRequest):
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/sync/answers/{testId}")
+def sync_answers(testId: str):
+    """
+    POST /sync/answers/{testId}
+    Fetches answers from the external URL and syncs them to DynamoDB
+    """
+    try:
+        result = candidate_service.sync_answers_from_external(testId)
+        if not result["success"]:
+            raise HTTPException(status_code=500, detail=result["message"])
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
